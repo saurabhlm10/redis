@@ -1,4 +1,5 @@
 import * as net from "net";
+import { parseRESP } from "./utils/parseRESP";
 
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
@@ -13,16 +14,27 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
   // Continuously handle data received from the client
   connection.on("data", (data) => {
     console.log(`Received data: ${data.toString()}`);
-    // Respond to each chunk of data received
-    data
-      .toString()
-      .trim()
-      .split("\n")
-      .forEach((command) => {
-        if (command.toLowerCase() === "ping") {
-          connection.write("+PONG\r\n");
-        }
-      });
+
+    // Parse the command
+    const parsedData = parseRESP(data);
+    const { command, args } = parsedData;
+
+    console.log("cmmands", command);
+    console.log("args", args);
+
+    if (command === "ping") {
+      connection.write("+PONG\r\n");
+    } else if (command === "echo") {
+      if (args.length > 0) {
+        // Respond with a bulk string
+        const response = `$${args[0]?.length}\r\n${args[0]}\r\n`;
+        connection.write(response);
+      } else {
+        connection.write("-Error: Missing argument for ECHO\r\n");
+      }
+    } else {
+      connection.write("-Error\r\n");
+    }
   });
 
   // Close the connection once done
