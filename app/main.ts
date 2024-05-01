@@ -14,7 +14,7 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     connection.write("+PONG\r\n");
   });
 
-  connection.end("end", () => {
+  connection.on("end", () => {
     console.log("client disconencted");
   });
 });
