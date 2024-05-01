@@ -10,12 +10,15 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     `[server] connected client: ${JSON.stringify(connection.address())}`
   );
 
-  connection.on("data", () => {
+  connection.on("data", (data) => {
+    console.log(`Received data: ${data.toString()}`);
+    // Send hardcoded PONG response
     connection.write("+PONG\r\n");
   });
 
+  // Close the connection once done
   connection.on("end", () => {
-    console.log("client disconencted");
+    console.log("Client disconnected");
   });
 });
 
