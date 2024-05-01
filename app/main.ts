@@ -10,15 +10,29 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     `[server] connected client: ${JSON.stringify(connection.address())}`
   );
 
+  // Continuously handle data received from the client
   connection.on("data", (data) => {
     console.log(`Received data: ${data.toString()}`);
-    // Send hardcoded PONG response
-    connection.write("+PONG\r\n");
+    // Respond to each chunk of data received
+    data
+      .toString()
+      .trim()
+      .split("\n")
+      .forEach((command) => {
+        if (command.toLowerCase() === "ping") {
+          connection.write("+PONG\r\n");
+        }
+      });
   });
 
   // Close the connection once done
   connection.on("end", () => {
     console.log("Client disconnected");
+  });
+
+  // Handle any errors on the connection
+  connection.on("error", (err) => {
+    console.error("Connection error: ", err);
   });
 });
 
