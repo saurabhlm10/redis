@@ -6,6 +6,8 @@ console.log("Logs from your program will appear here!");
 
 // Uncomment this block to pass the first stage
 const server: net.Server = net.createServer((connection: net.Socket) => {
+  const values = new Map();
+
   // Handle connection
   console.log(
     `[server] connected client: ${JSON.stringify(connection.address())}`
@@ -32,6 +34,12 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       } else {
         connection.write("-Error: Missing argument for ECHO\r\n");
       }
+    } else if (command.toLowerCase() === "set") {
+      values.set(args[0], args[1]);
+      connection.write("+OK\r\n");
+    } else if (command.toLowerCase() === "get") {
+      const value = values.get(args[0]);
+      connection.write(`$${value ? value.length + "\r\n" + value : "-1"}\r\n`);
     } else {
       connection.write("-Error\r\n");
     }
