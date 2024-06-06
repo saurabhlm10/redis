@@ -37,6 +37,11 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     } else if (command.toLowerCase() === "set") {
       values.set(args[0], args[1]);
       connection.write("+OK\r\n");
+      if (args[2]?.toLowerCase() === "px") {
+        setTimeout(() => {
+          values.delete(args[0]);
+        }, Number(args[3]));
+      }
     } else if (command.toLowerCase() === "get") {
       const value = values.get(args[0]);
       connection.write(`$${value ? value.length + "\r\n" + value : "-1"}\r\n`);
