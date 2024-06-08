@@ -1,15 +1,20 @@
 import * as net from "net";
 import { parseRESP } from "./utils/parseRESP";
-import { argv } from "process";
+import { ServerConfig } from "./types";
+import { serverParams } from "./utils/parseServerArguments";
+import { simpleString } from "./utils/simpleString";
+import { bulkString } from "./utils/bulkString";
 
-const PORT = argv[2] === "--port" ? Number(argv[3]) : 6379;
+const serverConfig: ServerConfig = {
+  role: serverParams?.role || "master",
+  port: Number(serverParams?.port) || 6379,
+};
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
 // Uncomment this block to pass the first stage
 const server: net.Server = net.createServer((connection: net.Socket) => {
   const values = new Map();
-
   // Handle connection
   console.log(
     `[server] connected client: ${JSON.stringify(connection.address())}`
@@ -26,19 +31,19 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     console.log("cmmands", command);
     console.log("args", args);
 
-    if (command === "ping") {
-      connection.write("+PONG\r\n");
-    } else if (command === "echo") {
+    if (command.toLowerCase() === "ping") {
+      // connection.write("+PONG\r\n");
+      connection.write(simpleString("PONG"));
+    } else if (command.toLowerCase() === "echo") {
       if (args.length > 0) {
-        // Respond with a bulk string
-        const response = `$${args[0]?.length}\r\n${args[0]}\r\n`;
+        const response = bulkString(args[0] as string);
         connection.write(response);
       } else {
         connection.write("-Error: Missing argument for ECHO\r\n");
       }
     } else if (command.toLowerCase() === "set") {
       values.set(args[0], args[1]);
-      connection.write("+OK\r\n");
+      connection.write(simpleString("OK"));
       if (args[2]?.toLowerCase() === "px") {
         setTimeout(() => {
           values.delete(args[0]);
@@ -46,9 +51,12 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       }
     } else if (command.toLowerCase() === "get") {
       const value = values.get(args[0]);
-      connection.write(`$${value ? value.length + "\r\n" + value : "-1"}\r\n`);
+      connection.write(bulkString(value));
     } else if (command.toLowerCase() === "info") {
-      const response = `$11\r\nrole:master\r\n`;
+      let role = "master";
+      const master = serverParams["replicaof"];
+      if (master) role = "slave";
+      const response = bulkString(`role:${role}`);
       connection.write(response);
     } else {
       connection.write("-Error\r\n");
@@ -66,4 +74,6 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
   });
 });
 
-server.listen(PORT, "127.0.0.1");
+console.log(serverParams);
+
+server.listen(serverConfig.port, "127.0.0.1");
