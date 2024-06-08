@@ -47,6 +47,9 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     } else if (command.toLowerCase() === "get") {
       const value = values.get(args[0]);
       connection.write(`$${value ? value.length + "\r\n" + value : "-1"}\r\n`);
+    } else if (command.toLowerCase() === "info") {
+      const response = `$11\r\nrole:master\r\n`;
+      connection.write(response);
     } else {
       connection.write("-Error\r\n");
     }
