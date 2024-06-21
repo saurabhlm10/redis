@@ -23,7 +23,17 @@ if (!isMaster) {
   );
   client.on("data", (data) => {
     console.log("Received from the master server:", data.toString());
-    client.end();
+
+    const receivedData = data.toString();
+    console.log("Received from the master server:", receivedData);
+    if (receivedData == simpleString("PONG"))
+      client.write(
+        arrToRESP(["REPLCONF", "listening-port", `${serverConfig.port}`])
+      );
+    if (receivedData == simpleString("OK")) {
+      client.write(arrToRESP(["REPLCONF", "capa", "psync2"]));
+      client.end();
+    }
   });
   client.on("end", () => {
     console.log("Disconnected from the master server");
@@ -84,6 +94,9 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       const response = bulkString(
         `role:${role}\r\nmaster_replid:${master_replid}\r\nmaster_repl_offset:${master_repl_offset}\r\n`
       );
+      connection.write(response);
+    } else if (command.toLowerCase() === "replconf") {
+      const response = simpleString("OK");
       connection.write(response);
     } else {
       connection.write("-Error\r\n");
