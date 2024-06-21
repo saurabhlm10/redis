@@ -4,11 +4,15 @@ import { ServerConfig } from "./types";
 import { serverParams } from "./utils/parseServerArguments";
 import { simpleString } from "./utils/simpleString";
 import { bulkString } from "./utils/bulkString";
+import { initMaster } from "./utils/initMaster";
 
 const serverConfig: ServerConfig = {
   role: serverParams?.role || "master",
   port: Number(serverParams?.port) || 6379,
 };
+const HOST = "127.0.0.1";
+initMaster();
+console.log("serverParams", serverParams);
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
@@ -54,9 +58,11 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       connection.write(bulkString(value));
     } else if (command.toLowerCase() === "info") {
       let role = "master";
-      const master = serverParams["replicaof"];
-      if (master) role = "slave";
-      const response = bulkString(`role:${role}`);
+      const { master_replid, master_repl_offset } = serverParams;
+      if (!master_replid) role = "slave";
+      const response = bulkString(
+        `role:${role}\r\nmaster_replid:${master_replid}\r\nmaster_repl_offset:${master_repl_offset}\r\n`
+      );
       connection.write(response);
     } else {
       connection.write("-Error\r\n");
@@ -74,6 +80,4 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
   });
 });
 
-console.log(serverParams);
-
-server.listen(serverConfig.port, "127.0.0.1");
+server.listen(serverConfig.port, HOST);
