@@ -5,13 +5,34 @@ import { serverParams } from "./utils/parseServerArguments";
 import { simpleString } from "./utils/simpleString";
 import { bulkString } from "./utils/bulkString";
 import { initMaster } from "./utils/initMaster";
+import { arrToRESP } from "./utils/arrToRESP";
 
 const serverConfig: ServerConfig = {
   role: serverParams?.role || "master",
   port: Number(serverParams?.port) || 6379,
 };
 const HOST = "127.0.0.1";
-initMaster();
+const isMaster = initMaster();
+if (!isMaster) {
+  const client = net.createConnection(
+    { host: serverParams.masterUrl, port: +serverParams.masterPort },
+    () => {
+      console.log("Connected to the master server");
+      client.write(arrToRESP(["ping"]));
+    }
+  );
+  client.on("data", (data) => {
+    console.log("Received from the master server:", data.toString());
+    client.end();
+  });
+  client.on("end", () => {
+    console.log("Disconnected from the master server");
+  });
+  client.on("error", (err) => {
+    console.error("Client error:", err);
+  });
+}
+
 console.log("serverParams", serverParams);
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
