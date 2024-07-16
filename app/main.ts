@@ -41,7 +41,9 @@ if (!isMaster) {
       handshakeData.currentStep == 2
     )
       handshakeData.currentStep = 3;
+
     handleHandshake(client, handshakeData);
+    handshakeData.currentStep === 3 && client.end();
   });
   client.on("end", () => {
     console.log("Disconnected from the master server");
@@ -51,7 +53,6 @@ if (!isMaster) {
   });
 }
 
-console.log("serverParams", serverParams);
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
@@ -108,7 +109,12 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       connection.write(response);
     } else if (command.toLowerCase() === "psync") {
       const { master_replid, master_repl_offset } = serverParams;
-      return simpleString(`FULLRESYNC ${master_replid} ${master_repl_offset}`);
+      console.log(master_replid);
+      console.log(master_repl_offset);
+      const response = simpleString(
+        `FULLRESYNC ${master_replid} ${master_repl_offset}`
+      );
+      connection.write(response);
     } else {
       connection.write("-Error\r\n");
     }
