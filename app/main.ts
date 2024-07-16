@@ -6,6 +6,7 @@ import { simpleString } from "./utils/simpleString";
 import { bulkString } from "./utils/bulkString";
 import { initMaster } from "./utils/initMaster";
 import { arrToRESP } from "./utils/arrToRESP";
+import { handleHandshake } from "./utils/handleHandShake";
 
 const serverConfig: ServerConfig = {
   role: serverParams?.role || "master",
@@ -13,7 +14,9 @@ const serverConfig: ServerConfig = {
 };
 const HOST = "127.0.0.1";
 const isMaster = initMaster();
+
 if (!isMaster) {
+  const handshakeData = { clientPort: serverConfig.port, currentStep: 0 };
   const client = net.createConnection(
     { host: serverParams.masterUrl, port: +serverParams.masterPort },
     () => {
@@ -26,14 +29,19 @@ if (!isMaster) {
 
     const receivedData = data.toString();
     console.log("Received from the master server:", receivedData);
-    if (receivedData == simpleString("PONG"))
-      client.write(
-        arrToRESP(["REPLCONF", "listening-port", `${serverConfig.port}`])
-      );
-    if (receivedData == simpleString("OK")) {
-      client.write(arrToRESP(["REPLCONF", "capa", "psync2"]));
-      client.end();
-    }
+    if (receivedData == simpleString("PONG") && handshakeData.currentStep === 0)
+      handshakeData.currentStep = 1;
+    else if (
+      receivedData == simpleString("OK") &&
+      handshakeData.currentStep === 1
+    ) {
+      handshakeData.currentStep = 2;
+    } else if (
+      receivedData == simpleString("OK") &&
+      handshakeData.currentStep == 2
+    )
+      handshakeData.currentStep = 3;
+    handleHandshake(client, handshakeData);
   });
   client.on("end", () => {
     console.log("Disconnected from the master server");
@@ -98,6 +106,9 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
     } else if (command.toLowerCase() === "replconf") {
       const response = simpleString("OK");
       connection.write(response);
+    } else if (command.toLowerCase() === "psync") {
+      const { master_replid, master_repl_offset } = serverParams;
+      return simpleString(`FULLRESYNC ${master_replid} ${master_repl_offset}`);
     } else {
       connection.write("-Error\r\n");
     }
