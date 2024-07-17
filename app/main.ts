@@ -7,6 +7,7 @@ import { bulkString } from "./utils/bulkString";
 import { initMaster } from "./utils/initMaster";
 import { arrToRESP } from "./utils/arrToRESP";
 import { handleHandshake } from "./utils/handleHandShake";
+import { createEmptyRDBContent } from "./utils/createEmptyRDBContent";
 
 const serverConfig: ServerConfig = {
   role: serverParams?.role || "master",
@@ -43,7 +44,7 @@ if (!isMaster) {
       handshakeData.currentStep = 3;
 
     handleHandshake(client, handshakeData);
-    handshakeData.currentStep === 3 && client.end();
+    // handshakeData.currentStep === 3 && client.end();
   });
   client.on("end", () => {
     console.log("Disconnected from the master server");
@@ -109,12 +110,14 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       connection.write(response);
     } else if (command.toLowerCase() === "psync") {
       const { master_replid, master_repl_offset } = serverParams;
-      console.log(master_replid);
-      console.log(master_repl_offset);
       const response = simpleString(
         `FULLRESYNC ${master_replid} ${master_repl_offset}`
       );
       connection.write(response);
+      const emptyRDB = createEmptyRDBContent();
+      const rdbLength = emptyRDB.length;
+      connection.write(`$${rdbLength}\r\n`);
+      connection.write(emptyRDB);
     } else {
       connection.write("-Error\r\n");
     }
