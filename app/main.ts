@@ -8,6 +8,8 @@ import { initMaster } from "./utils/initMaster";
 import { arrToRESP } from "./utils/arrToRESP";
 import { handleHandshake } from "./utils/handleHandShake";
 import { createEmptyRDBContent } from "./utils/createEmptyRDBContent";
+import { isWriteCommand } from "./utils/isWriteCommand";
+import { processCommand } from "./utils/processCommand";
 
 const serverConfig: ServerConfig = {
   role: serverParams?.role || "master",
@@ -18,6 +20,8 @@ const isMaster = initMaster();
 
 if (!isMaster) {
   const handshakeData = { clientPort: serverConfig.port, currentStep: 0 };
+  let handshakeComplete = false;
+
   const client = net.createConnection(
     { host: serverParams.masterUrl, port: +serverParams.masterPort },
     () => {
@@ -42,9 +46,27 @@ if (!isMaster) {
       handshakeData.currentStep == 2
     )
       handshakeData.currentStep = 3;
+    else if (
+      receivedData.startsWith("+FULLRESYNC") &&
+      handshakeData.currentStep === 3
+    ) {
+      handshakeComplete = true;
+      console.log("Handshake complete, received FULLRESYNC");
+      return;
+    }
 
-    handleHandshake(client, handshakeData);
-    // handshakeData.currentStep === 3 && client.end();
+    console.log(handshakeData.currentStep);
+
+    console.log("handshake", handshakeComplete);
+
+    if (!handshakeComplete) {
+      handleHandshake(client, handshakeData);
+    }
+
+    if (handshakeComplete && receivedData.startsWith("+FULLRESYNC")) {
+      // Handle FULLRESYNC response
+      console.log("Received FULLRESYNC, waiting for RDB file...");
+    }
   });
   client.on("end", () => {
     console.log("Disconnected from the master server");
@@ -57,8 +79,11 @@ if (!isMaster) {
 // You can use print statements as follows for debugging, they'll be visible when running tests.
 console.log("Logs from your program will appear here!");
 
+const replicaConnections: Set<net.Socket> = new Set();
+
 // Uncomment this block to pass the first stage
 const server: net.Server = net.createServer((connection: net.Socket) => {
+  let isReplica = false;
   const values = new Map();
   // Handle connection
   console.log(
@@ -86,14 +111,21 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       } else {
         connection.write("-Error: Missing argument for ECHO\r\n");
       }
-    } else if (command.toLowerCase() === "set") {
-      values.set(args[0], args[1]);
-      connection.write(simpleString("OK"));
-      if (args[2]?.toLowerCase() === "px") {
-        setTimeout(() => {
-          values.delete(args[0]);
-        }, Number(args[3]));
+    } else if (isWriteCommand(command)) {
+      console.log(replicaConnections);
+      // Process the command
+      processCommand(command, args, values);
+
+      // Propagate the command to replicas
+      const respCommand = arrToRESP([command, ...args]);
+      for (const replica of replicaConnections) {
+        replica.write(respCommand);
       }
+
+      console.log(values);
+
+      // Send response to the client
+      connection.write(simpleString("OK"));
     } else if (command.toLowerCase() === "get") {
       const value = values.get(args[0]);
       connection.write(bulkString(value));
@@ -106,9 +138,12 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       );
       connection.write(response);
     } else if (command.toLowerCase() === "replconf") {
+      isReplica = true;
       const response = simpleString("OK");
       connection.write(response);
     } else if (command.toLowerCase() === "psync") {
+      isReplica = true;
+      replicaConnections.add(connection);
       const { master_replid, master_repl_offset } = serverParams;
       const response = simpleString(
         `FULLRESYNC ${master_replid} ${master_repl_offset}`
@@ -130,6 +165,9 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
 
   // Handle any errors on the connection
   connection.on("error", (err) => {
+    if (isReplica) {
+      replicaConnections.delete(connection);
+    }
     console.error("Connection error: ", err);
   });
 });
