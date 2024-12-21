@@ -10,7 +10,7 @@ export function serializeBulkString(value: string) {
   return new Uint8Array(Buffer.from(str));
 }
 
-export function serialazeSimpleError(value: string) {
+export function serializeSimpleError(value: string) {
   const str = `-${value}\r\n`;
   return new Uint8Array(new Buffer(str));
 }

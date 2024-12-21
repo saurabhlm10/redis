@@ -1,7 +1,7 @@
 import * as net from "net";
 import { parse } from "./utils/parse";
 import {
-  serialazeSimpleError,
+  serializeSimpleError,
   serializeBulkString,
   serializeSimpleString,
 } from "./utils/serialize";
@@ -24,7 +24,7 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
         break;
       default:
         // throw Error(`Unknown command: ${input[0]}`);
-        connection.write(serialazeSimpleError(`Unknown command: ${input[0]}`));
+        connection.write(serializeSimpleError(`Unknown command: ${input[0]}`));
     }
   });
 });
