@@ -13,6 +13,14 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
       case "ECHO":
         connection.write(handler.ECHO(input[1] as string));
         break;
+      case "SET":
+        connection.write(
+          handler.SET(...(input.slice(1) as Array<string | undefined>))
+        );
+        break;
+      case "GET":
+        connection.write(handler.GET(input[1] as string | undefined));
+        break;
       default:
         connection.write(handler.ERROR(input));
     }
