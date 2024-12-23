@@ -1,6 +1,7 @@
 import * as net from "net";
 import { parse } from "./utils/parse";
 import handler from "./handler";
+import { serializeSimpleError } from "./utils/serialize";
 
 const server: net.Server = net.createServer((connection: net.Socket) => {
   connection.on("data", (data) => {
@@ -20,6 +21,19 @@ const server: net.Server = net.createServer((connection: net.Socket) => {
         break;
       case "GET":
         connection.write(handler.GET(input[1] as string | undefined));
+        break;
+      case "CONFIG":
+        switch ((input[1] as string).toUpperCase()) {
+          case "GET":
+            connection.write(
+              handler.CONFIG_GET(input[2] as string | undefined)
+            );
+            break;
+          default:
+            connection.write(
+              serializeSimpleError(`Unknown CONFIG command: ${input[1]}`)
+            );
+        }
         break;
       default:
         connection.write(handler.ERROR(input));

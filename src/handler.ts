@@ -1,9 +1,27 @@
+import { parseArgs } from "util";
 import type { RESPDataType } from "./utils/parse";
 import {
   serializeSimpleError,
   serializeBulkString,
   serializeSimpleString,
+  serializeArray,
 } from "./utils/serialize";
+
+const { values } = parseArgs({
+  args: process.argv,
+  options: {
+    dir: {
+      type: "string",
+    },
+    dbfilename: {
+      type: "string",
+    },
+  },
+  strict: true,
+  allowPositionals: true,
+});
+
+console.log(values);
 
 class Handler {
   private storage = new Map();
@@ -18,7 +36,6 @@ class Handler {
     return serializeSimpleError(`Unknown command: ${input[0]}`);
   }
   SET(...args: Array<string | undefined>) {
-    console.log(args);
     const key = args[0];
     const value = args[1];
     if (!key) {
@@ -41,7 +58,6 @@ class Handler {
     return serializeSimpleString("OK");
   }
   GET(key: string | undefined) {
-    console.log(this.storage);
     if (!key || !this.storage.has(key)) {
       return serializeBulkString("");
     }
@@ -54,6 +70,25 @@ class Handler {
     }
 
     return serializeBulkString(value);
+  }
+
+  CONFIG_GET(arg: string | undefined) {
+    if (!arg) return serializeSimpleError("No parameters provided");
+
+    switch (arg.toLowerCase()) {
+      case "dir":
+        return serializeArray(
+          serializeBulkString("dir"),
+          serializeBulkString(values.dir || "")
+        );
+      case "dbfilename":
+        return serializeArray(
+          serializeBulkString("dbfilename"),
+          serializeBulkString(values.dbfilename || "")
+        );
+      default:
+        return serializeSimpleError(`Invalid parameter: '${arg}'`);
+    }
   }
 }
 
