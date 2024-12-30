@@ -18,7 +18,7 @@ export function serializeBulkString(value: string) {
 
 export function serializeSimpleError(value: string) {
   const str = `-${value}\r\n`;
-  return new Uint8Array(new Buffer(str));
+  return new Uint8Array(Buffer.from(str));
 }
 
 export function serializeArray(...args: Uint8Array[]) {

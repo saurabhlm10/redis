@@ -1,4 +1,3 @@
-import { parseArgs } from "util";
 import type { RESPDataType } from "./utils/parse";
 import {
   serializeSimpleError,
@@ -6,25 +5,21 @@ import {
   serializeSimpleString,
   serializeArray,
 } from "./utils/serialize";
+import { db, type IMapValueType } from "./index";
 
-const { values } = parseArgs({
-  args: process.argv,
-  options: {
-    dir: {
-      type: "string",
-    },
-    dbfilename: {
-      type: "string",
-    },
-  },
-  strict: true,
-  allowPositionals: true,
-});
+interface IValuesType {
+  dir?: string | undefined;
+  dbfilename?: string | undefined;
+}
 
-console.log(values);
+export class Handler {
+  private storage: Map<string, IMapValueType>;
+  private values: IValuesType;
 
-class Handler {
-  private storage = new Map();
+  constructor(values: IValuesType) {
+    this.storage = db;
+    this.values = values;
+  }
 
   PING() {
     return serializeSimpleString("PONG");
@@ -51,9 +46,12 @@ class Handler {
           "SYNTAX ERR expecting expiry time after PX"
         );
       }
-      this.storage.set(key, { value, expiry: Date.now() + Number(args[3]) });
+      this.storage.set(key, {
+        value,
+        expire: BigInt(Date.now() + Number(args[3])),
+      });
     } else {
-      this.storage.set(key, { value, expiry: null });
+      this.storage.set(key, { value, expire: null });
     }
     return serializeSimpleString("OK");
   }
@@ -62,9 +60,9 @@ class Handler {
       return serializeBulkString("");
     }
 
-    const { value, expiry } = this.storage.get(key);
+    const { value, expire } = this.storage.get(key) as IMapValueType;
 
-    if (expiry && expiry - Date.now() <= 0) {
+    if (expire && expire - BigInt(Date.now()) <= 0) {
       this.storage.delete(key);
       return serializeBulkString("");
     }
@@ -79,17 +77,31 @@ class Handler {
       case "dir":
         return serializeArray(
           serializeBulkString("dir"),
-          serializeBulkString(values.dir || "")
+          serializeBulkString(this.values.dir || "")
         );
       case "dbfilename":
         return serializeArray(
           serializeBulkString("dbfilename"),
-          serializeBulkString(values.dbfilename || "")
+          serializeBulkString(this.values.dbfilename || "")
         );
       default:
         return serializeSimpleError(`Invalid parameter: '${arg}'`);
     }
   }
-}
 
-export default new Handler();
+  KEYS(arg: string | undefined) {
+    if (!arg)
+      return serializeSimpleError(
+        "ERR wrong number of arguments for 'KEYS' command"
+      );
+
+    if (arg === "*") {
+      const keys = Array.from(this.storage.keys()).map((key) =>
+        serializeBulkString(key)
+      );
+
+      return serializeArray(...keys);
+    }
+    return serializeBulkString("");
+  }
+}
